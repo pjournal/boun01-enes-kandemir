@@ -1,0 +1,179 @@
+---
+title: "HW2"
+author: "Mehmet Enes Kandemir"
+date: "25 08 2020"
+output: html_document
+  
+---
+
+## Introduction
+
+I will analyze electricity price of EPIAS 01 july 2020 to 31 july 2020 in this report.The data can be downloaded from [here](https://rapor.epias.com.tr/rapor/xhtml/ptfSmfListeleme.xhtml;jsessionid=0elgpSR57O6UzVN3bghcFC17OCr9zytRX84_ETGh.prd-rapor-n41)
+
+## Packages Installation
+```{r setup,include= FALSE }
+knitr::opts_chunk$set(fig.align = 'center', echo = TRUE)
+
+
+```
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+```
+
+
+## Importing Data
+
+I imported data to here to analyze.I called it as electricity_data1 and I use glimpse() function to observe data.
+
+```{r}
+electricity_data1 = read.csv("electricity.csv")
+electricity_data1 %>% glimpse()
+
+```
+
+## Data Manipulation
+I saw that column's names are not proper and data type is string after glimpse() function. Therefore, I found new name for unproper columns and changed their name.I also added 3 new column to analyze data in terms of date.
+
+```{r}
+electricity_data1$PTF = as.numeric(gsub(",", ".", electricity_data1$PTF))
+electricity_data1$SMF = as.numeric(gsub(",", ".", electricity_data1$SMF))
+electricity_data1$Pozitif.Dengesizlik.Fiyatı..TL.MWh. = as.numeric(gsub(",", ".", electricity_data1$Pozitif.Dengesizlik.Fiyatı..TL.MWh. ))
+electricity_data1$Negatif.Dengesizlik.Fiyatı..TL.MWh. = as.numeric(gsub(",", ".",  electricity_data1$Negatif.Dengesizlik.Fiyatı..TL.MWh.))
+
+
+```
+
+```{r}
+electricity_data2 <- electricity_data1 %>%
+  
+   rename("MCP" = PTF, 
+         "SMP" = SMF, 
+         "Positive Imbalance Price" = Pozitif.Dengesizlik.Fiyatı..TL.MWh.,
+         "Negative Imbalance Price" = Negatif.Dengesizlik.Fiyatı..TL.MWh.,
+         "SMP Direction" = SMF.Yön,
+         "Date" = Tarih) %>%
+  mutate(DateTime = as.POSIXct(Date, format = "%d.%m.%y %H:%M")) %>%
+  mutate(Day = wday(DateTime, label = T, week_start = 1), Hour = hour(DateTime))
+
+electricity_data2 %>% glimpse()
+```
+
+# ANALYSIS
+
+## Distribution of MCP and SMP
+
+After changes on dataset, I wanted to observe distribution of MCP and SMP on table and compare them properly.This scatterplot show that SMP are placed on more intensivly than MCP at high level(300-400).We can say that difference between Day Ahead Market and Balancing Power Market is natural result of this deficit or surplus.
+
+```{r}
+ggplot(electricity_data2, aes(x = SMP, y = MCP, color = DateTime)) +
+  geom_point() +
+  labs(title = "Distribution of MCP anmcd SMP", subtitle = "July 2020", x = "System Marginal Price", y = "Market Clearing Price")
+```
+# Market Cleaning Price
+I determined daily and hourly avarage Mcp to make observation on graph and compare days and hours in terms of price.I can say that price is fallen on weekend,because many people work on these days and increase usage of electricity. Also we can see that people use the most amount of electricity before sleeping (20-21) and the least amount of electricity before work(6-7).
+
+## Daily Averages of MCP 
+
+
+```{r}
+daily_mcp = electricity_data2 %>% 
+  group_by(Day) %>% 
+  summarise(avg_mcp = mean(MCP), .groups = 'drop') 
+  daily_mcp %>% kable()
+
+```
+
+```{r}
+ggplot(daily_mcp, aes(x=Day, y= avg_mcp)) +
+  geom_col()+
+ labs(x = "Week Days", 
+       y = "Average MCP", 
+       title = "Average MCP for Days")
+       
+```
+
+## Hourly Avareges of MCP
+
+
+```{r}
+
+hourly_mcp = electricity_data2 %>%
+  group_by(Hour) %>%
+  summarise(avg_mcp=mean(MCP), .groups = 'drop')
+kable(hourly_mcp)
+
+```
+```{r}
+ggplot(hourly_mcp,aes(x= Hour,y=avg_mcp)) + 
+  geom_line(size=1.1) + 
+  expand_limits(y = 0) + 
+  labs(x="hours",
+       y="avarage MCP",
+       title="Avarage MCP for hours")
+```
+
+
+
+# System Marginal Prices
+
+We can say that providers can predict usage od electricit more accurately after two days of weekdays.Therefore Wednesday is the least price of week.Also I decide that price decreased at night especially at 6 and 7.
+ 
+## Daily Avareges of SMP
+
+```{r}
+daily_smp = electricity_data2 %>% 
+  group_by(Day) %>% 
+  summarise(avg_smp = mean(SMP), .groups = 'drop') 
+  daily_smp %>% kable()
+```
+
+
+```{r}
+ggplot(daily_smp, aes(x=Day, y= avg_smp)) +
+  geom_col()+
+ labs(x = "Week Days", 
+       y = "Average SMP", 
+       title = "Average SMP for Days")
+```
+
+## Hourly Avareges of SMP
+
+```{r}
+hourly_smp = electricity_data2 %>%
+  group_by(Hour) %>%
+  summarize(avg_smp = mean(SMP), .groups = 'drop')
+kable(hourly_smp)
+
+```
+
+
+
+```{r}
+ggplot(hourly_smp,aes(x= Hour,y=avg_smp)) + 
+  geom_line(size=1.1) + 
+  expand_limits(y = 0) + 
+  labs(x="hours",
+       y="avarage SMP",
+       title="Avarage SMP for hours")
+```
+
+
+## REFERENCES
+
+[[*Energy Exchange Istanbul(EXIST) page*]](https://rapor.epias.com.tr/rapor/xhtml/ptfSmfListeleme.xhtml;jsessionid=0elgpSR57O6UzVN3bghcFC17OCr9zytRX84_ETGh.prd-rapor-n41)
+
+
+
+
+
+
+
+ 
+
