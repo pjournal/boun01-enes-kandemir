@@ -1,0 +1,261 @@
+---
+title: "assigment_4"
+author: "Enes"
+date: "13 09 2020"
+output:  
+  html_document:
+          toc: true
+          toc_depth: 3
+          toc_float: true
+          number_sections: true
+          code_folding: hide
+          theme: journal 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Esoph Data
+
+## Introduction
+
+### Packages
+
+```{r,warning=FALSE,message=FALSE}
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(ggthemes)
+library(ggpubr)
+library(knitr)
+library(corrplot)
+```
+
+
+### Data Overview
+
+
+
+```{r}
+data<-data.frame()
+data<-esoph
+
+glimpse(esoph)
+```
+
+```{r}
+summary(esoph)
+
+```
+## EDA for Esoph Data 
+
+### Age Effect on Percentage of Cases
+
+```{r,warning=FALSE,message=FALSE}
+age_effect <- esoph %>% group_by(agegp) %>%
+    summarise(tot_rows = n(), people_cancer = sum(ncases), people_total = sum(ncontrols),
+              percentage=people_cancer*100/people_total)
+
+ggplot(age_effect, aes(x=agegp, 
+                       y=percentage, 
+                       fill=agegp)) + 
+                       geom_col()+
+                       labs(x="Age Groups",y="Percentage of Cases", title= "Cancer Cases for each Age Groups") + 
+                       theme(legend.position = "none")
+```
+
+### Alcohol Effect on Percentage of Cases
+
+```{r,warning=FALSE,message=FALSE}
+alcohol_effect <- esoph %>% group_by(alcgp) %>%
+    summarise(tot_rows = n(), people_cancer = sum(ncases), people_total = sum(ncontrols),
+              percentage=people_cancer*100/people_total)
+
+ggplot(alcohol_effect, aes(x=alcgp,
+                           y=percentage, 
+                           fill=alcgp)) + 
+        geom_col( ) +
+
+labs(         x="Alcohol Consumption",
+              y="Percentage of Cases", 
+              title= "Cases for Alcohol consumption") + 
+              theme(legend.position = "none")
+```
+
+
+### Tobocco Effect on Percentage of Cases
+
+```{r,warning=FALSE,message=FALSE}
+tobacco_effect <- esoph %>% group_by(tobgp) %>%
+    summarise(tot_rows = n(), 
+              people_cancer = sum(ncases), 
+              people_total = sum(ncontrols),
+              percentage=people_cancer*100/people_total)
+
+ggplot(tobacco_effect, aes(x=tobgp, 
+                           y=percentage, 
+                           fill=tobgp)) + 
+        geom_bar(stat = "identity") + 
+  
+  labs(x="Tobacco Consumption",
+       y="Percentage of Cases", 
+       title= "Cases for Tobacco consumption") + 
+       theme(legend.position = "none")
+```
+
+
+### Comparison of Tobocco and Alcohol
+
+```{r,warning=FALSE,message=FALSE}
+tobgp_and_alcgp<- esoph %>% 
+  group_by(tobgp,alcgp)%>% 
+  summarise(tot_rows = n(),
+              total_case = sum(ncases), 
+              total_control = sum(ncontrols), 
+              percentage=100*(total_case/total_control))
+
+ggplot(tobgp_and_alcgp,aes(x=alcgp,
+                       y=percentage,
+                       fill=alcgp))+
+  geom_col( )+
+  facet_grid(tobgp ~.)+
+  theme(text=element_text(size=8))+
+  labs(x="Alcohol Consumption",
+       y="Cancer Percentage",
+       title="Alcohol Consumption and Tobocco Consumption according to Cancer Percentage") +
+  theme(legend.position = "none")
+```
+
+
+# Young People Survey Data
+
+## Introduction
+
+```{r,warning=FALSE,message=FALSE}
+response <- read_csv("dataset.csv")
+glimpse(response)
+
+```
+## PCA for Survey Data
+
+```{r}
+fil_res <- response %>%
+  select("Music":"Dancing")
+
+fil_res=fil_res[complete.cases(fil_res),]
+
+fil_res_pca <- princomp(as.matrix(fil_res),cor=T)
+summary(fil_res_pca,loadings=TRUE)
+
+
+```
+
+
+
+```{r}
+ggplot(data=data.frame(PC=1:length(fil_res_pca$sdev),
+Cumulative_Variance=cumsum(fil_res_pca$sdev^2/sum(fil_res_pca$sdev^2))),
+aes(x=PC,y=Cumulative_Variance)) + geom_line() +
+geom_point() +
+scale_y_continuous(labels = scales::percent,breaks=seq(0,1,length.out=11)) +
+scale_x_continuous(breaks=seq(0,135,by=5))
+```
+
+
+
+## Multidimensional Scaling Method
+
+
+
+```{r}
+fil_res_mdsa<- response %>% select("History":"Pets")%>% drop_na()
+glimpse(head(as.data.frame(fil_res_mdsa)))
+
+
+```
+```{r}
+youth_responses_dist <- 1 - cor(fil_res_mdsa)
+
+
+fil_res_mdsa <- cmdscale(youth_responses_dist,k=2)
+colnames(fil_res_mdsa) <- c("x","y")
+print(fil_res_mdsa)
+```
+```{r}
+ggplot(data.frame(fil_res_mdsa),aes(x=x,y=y)) + geom_text(label=rownames(fil_res_mdsa),angle=30,size=3)+labs(title="MDS", x= "x coordinate",y="y coordinate")
+```
+
+
+
+## K-Means Method
+
+
+```{r}
+set.seed(58)
+
+genre_cluster<-kmeans(fil_res_mdsa,centers=6)
+mds_clusters<-
+data.frame(genre=names(genre_cluster$cluster),
+cluster_mds=genre_cluster$cluster) %>% arrange(cluster_mds,genre)
+mds_clusters
+```
+
+```{r}
+ggplot(
+    data.frame(fil_res_mdsa) %>% mutate(clusters=as.factor(genre_cluster$cluster),
+    genres=rownames(fil_res_mdsa)),aes(x=x,y=y)) +
+    geom_text(aes(label=genres,color=clusters),angle=45,size=2) +
+    geom_point(data=as.data.frame(genre_cluster$centers),aes(x=x,y=y)
+)
+```
+
+
+
+
+## References 
+1. [IE48A Lecture Notes](https://mef-bda503.github.io/archive/fall17/files/intro_to_ml.html)
+2. [Data_1](https://www.kaggle.com/miroslavsabo/young-people-survey)
+3. [Data_2](https://www.rdocumentation.org/packages/datasets/versions/3.6.2/topics/esoph)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
