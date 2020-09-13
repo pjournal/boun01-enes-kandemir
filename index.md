@@ -12,6 +12,7 @@
 
 ### Assignment3
 
+[Assigment 3](assigment_3.html)
 
 
 # R-sızlar's Progress Journal
